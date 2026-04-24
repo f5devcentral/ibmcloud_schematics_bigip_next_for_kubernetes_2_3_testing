@@ -27,16 +27,16 @@ variable "ibmcloud_resource_group" {
 }
 
 # ============================================================
-# Referenced Cluster (required)
+# ROKS Output
 # ============================================================
 
-variable "cluster_name_or_id" {
+variable "roks_cluster_name_or_id" {
   description = "Name or ID of the existing OpenShift ROKS cluster"
   type        = string
 
   validation {
-    condition     = length(var.cluster_name_or_id) > 0
-    error_message = "cluster_name_or_id cannot be empty."
+    condition     = length(var.roks_cluster_name_or_id) > 0
+    error_message = "roks_cluster_name_or_id cannot be empty."
   }
 }
 
@@ -44,13 +44,13 @@ variable "cluster_name_or_id" {
 # Feature Flags
 # ============================================================
 
-variable "create_tgw_jumphost" {
+variable "testing_create_tgw_jumphost" {
   description = "Create a jumphost in a client VPC and (optionally) connect it to the cluster via a Transit Gateway"
   type        = bool
-  default     = false
+  default     = true
 }
 
-variable "create_cluster_jumphosts" {
+variable "testing_create_cluster_jumphosts" {
   description = "Create one jumphost per availability zone directly inside the cluster VPC"
   type        = bool
   default     = false
@@ -61,25 +61,25 @@ variable "create_cluster_jumphosts" {
 # Applied to both TGW and cluster jumphosts
 # ============================================================
 
-variable "ssh_key_name" {
+variable "testing_ssh_key_name" {
   description = "Name of the SSH key to inject into all jumphosts. Must exist in client_vpc_region (for TGW jumphost) and in ibmcloud_cluster_region (for cluster jumphosts)"
   type        = string
   default     = ""
 }
 
-variable "jumphost_profile" {
+variable "testing_jumphost_profile" {
   description = "Instance profile for all jumphosts (leave empty to auto-select from min_vcpu_count and min_memory_gb)"
   type        = string
   default     = ""
 }
 
-variable "min_vcpu_count" {
+variable "testing_min_vcpu_count" {
   description = "Minimum vCPU count when auto-selecting the instance profile"
   type        = number
   default     = 4
 }
 
-variable "min_memory_gb" {
+variable "testing_min_memory_gb" {
   description = "Minimum memory in GB when auto-selecting the instance profile"
   type        = number
   default     = 8
@@ -93,31 +93,31 @@ variable "min_memory_gb" {
 #   create_client_vpc = false          → existing VPC looked up by client_vpc_name in client_vpc_region
 # ============================================================
 
-variable "create_client_vpc" {
+variable "testing_create_client_vpc" {
   description = "Create a new client VPC for the TGW jumphost. When false, client_vpc_name must reference an existing VPC"
   type        = bool
   default     = false
 }
 
-variable "client_vpc_name" {
+variable "testing_client_vpc_name" {
   description = "Name of the client VPC — created when create_client_vpc = true, or looked up when create_client_vpc = false"
   type        = string
   default     = "tf-testing-vpc"
 }
 
-variable "client_vpc_region" {
+variable "testing_client_vpc_region" {
   description = "IBM Cloud region for the client VPC and TGW jumphost"
   type        = string
   default     = "ca-tor"
 }
 
-variable "transit_gateway_name" {
+variable "testing_transit_gateway_name" {
   description = "Name of an existing Transit Gateway to connect the client VPC to (leave empty to skip TGW attachment)"
   type        = string
   default     = ""
 }
 
-variable "tgw_jumphost_name" {
+variable "testing_tgw_jumphost_name" {
   description = "Name of the TGW-connected jumphost instance (used as prefix for subnet, gateway, security group, and floating IP)"
   type        = string
   default     = "tf-testing-jumphost-tgw"
@@ -127,7 +127,7 @@ variable "tgw_jumphost_name" {
 # Cluster Jumphosts — One per availability zone
 # ============================================================
 
-variable "cluster_jumphost_name_prefix" {
+variable "testing_cluster_jumphost_name_prefix" {
   description = "Name prefix for cluster jumphosts — zone name is appended (<prefix>-<zone>)"
   type        = string
   default     = "tf-testing-jumphost-cluster"

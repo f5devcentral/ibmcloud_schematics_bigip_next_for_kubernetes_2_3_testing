@@ -10,5 +10,5 @@ provider "ibm" {
 provider "ibm" {
   alias            = "vpc_region"
   ibmcloud_api_key = var.ibmcloud_api_key
-  region           = var.client_vpc_region
+  region           = var.testing_client_vpc_region
 }

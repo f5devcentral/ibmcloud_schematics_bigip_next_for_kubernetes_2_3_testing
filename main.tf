@@ -81,10 +81,10 @@ locals {
     # Runs with || true so a transient failure (network, cluster not ready) does
     # not abort the rest of the boot script. Re-run manually if needed:
     #   ibmcloud login --apikey <key> -r ${var.ibmcloud_cluster_region}
-    #   ibmcloud ks cluster config --cluster ${var.cluster_name_or_id} --admin
+    #   ibmcloud ks cluster config --cluster ${var.roks_cluster_name_or_id} --admin
     mkdir -p /root/.kube
     ibmcloud login --apikey "${var.ibmcloud_api_key}" -r "${var.ibmcloud_cluster_region}"${var.ibmcloud_resource_group != "" ? " -g \"${var.ibmcloud_resource_group}\"" : ""} || true
-    ibmcloud ks cluster config --cluster "${var.cluster_name_or_id}" --admin || true
+    ibmcloud ks cluster config --cluster "${var.roks_cluster_name_or_id}" --admin || true
     if [ -f /root/.kube/config ]; then
       chmod 600 /root/.kube/config
       mkdir -p /home/ubuntu/.kube
@@ -112,34 +112,34 @@ locals {
   # TGW jumphost — VPC resolution and image/profile selection
   # ----------------------------------------------------------
 
-  tgw_vpc_id = var.create_tgw_jumphost ? (
-    var.create_client_vpc ? ibm_is_vpc.client_vpc[0].id : data.ibm_is_vpc.existing_client_vpc[0].id
+  tgw_vpc_id = var.testing_create_tgw_jumphost ? (
+    var.testing_create_client_vpc ? ibm_is_vpc.client_vpc[0].id : data.ibm_is_vpc.existing_client_vpc[0].id
   ) : null
 
-  tgw_vpc_crn = var.create_tgw_jumphost ? (
-    var.create_client_vpc ? ibm_is_vpc.client_vpc[0].crn : data.ibm_is_vpc.existing_client_vpc[0].crn
+  tgw_vpc_crn = var.testing_create_tgw_jumphost ? (
+    var.testing_create_client_vpc ? ibm_is_vpc.client_vpc[0].crn : data.ibm_is_vpc.existing_client_vpc[0].crn
   ) : null
 
-  tgw_vpc_name = var.create_tgw_jumphost ? (
-    var.create_client_vpc ? ibm_is_vpc.client_vpc[0].name : data.ibm_is_vpc.existing_client_vpc[0].name
+  tgw_vpc_name = var.testing_create_tgw_jumphost ? (
+    var.testing_create_client_vpc ? ibm_is_vpc.client_vpc[0].name : data.ibm_is_vpc.existing_client_vpc[0].name
   ) : null
 
   # Default SG of the newly created client VPC (used only when create_client_vpc = true)
-  tgw_new_vpc_default_sg = (var.create_tgw_jumphost && var.create_client_vpc) ? ibm_is_vpc.client_vpc[0].default_security_group : null
+  tgw_new_vpc_default_sg = (var.testing_create_tgw_jumphost && var.testing_create_client_vpc) ? ibm_is_vpc.client_vpc[0].default_security_group : null
 
-  tgw_jumphost_zone = var.create_tgw_jumphost ? data.ibm_is_zones.vpc_region_zones[0].zones[0] : null
+  tgw_jumphost_zone = var.testing_create_tgw_jumphost ? data.ibm_is_zones.vpc_region_zones[0].zones[0] : null
 
-  tgw_ubuntu_images = var.create_tgw_jumphost ? [
+  tgw_ubuntu_images = var.testing_create_tgw_jumphost ? [
     for image in data.ibm_is_images.tgw_ubuntu_images[0].images :
     image if length(regexall("ubuntu-22-04.*minimal.*amd64", lower(image.name))) > 0
   ] : []
   tgw_jumphost_image_id = length(local.tgw_ubuntu_images) > 0 ? local.tgw_ubuntu_images[0].id : null
 
-  tgw_eligible_profiles = (var.create_tgw_jumphost && var.jumphost_profile == "") ? [
+  tgw_eligible_profiles = (var.testing_create_tgw_jumphost && var.testing_jumphost_profile == "") ? [
     for profile in data.ibm_is_instance_profiles.tgw_profiles[0].profiles :
-    profile if profile.vcpu_count[0].value >= var.min_vcpu_count && profile.memory[0].value >= var.min_memory_gb
+    profile if profile.vcpu_count[0].value >= var.testing_min_vcpu_count && profile.memory[0].value >= var.testing_min_memory_gb
   ] : []
-  tgw_jumphost_profile = var.jumphost_profile != "" ? var.jumphost_profile : (
+  tgw_jumphost_profile = var.testing_jumphost_profile != "" ? var.testing_jumphost_profile : (
     length(local.tgw_eligible_profiles) > 0 ? local.tgw_eligible_profiles[0].name : "bx2-4x16"
   )
 
@@ -147,21 +147,31 @@ locals {
   # Cluster jumphosts — zone set and image/profile selection
   # ----------------------------------------------------------
 
-  cluster_zones = var.create_cluster_jumphosts ? toset(data.ibm_is_zones.cluster_region_zones[0].zones) : toset([])
+  cluster_zones = var.testing_create_cluster_jumphosts ? toset(data.ibm_is_zones.cluster_region_zones[0].zones) : toset([])
 
-  cluster_ubuntu_images = var.create_cluster_jumphosts ? [
+  cluster_ubuntu_images = var.testing_create_cluster_jumphosts ? [
     for image in data.ibm_is_images.cluster_ubuntu_images[0].images :
     image if length(regexall("ubuntu-22-04.*minimal.*amd64", lower(image.name))) > 0
   ] : []
   cluster_jumphost_image_id = length(local.cluster_ubuntu_images) > 0 ? local.cluster_ubuntu_images[0].id : null
 
-  cluster_eligible_profiles = (var.create_cluster_jumphosts && var.jumphost_profile == "") ? [
+  cluster_eligible_profiles = (var.testing_create_cluster_jumphosts && var.testing_jumphost_profile == "") ? [
     for profile in data.ibm_is_instance_profiles.cluster_profiles[0].profiles :
-    profile if profile.vcpu_count[0].value >= var.min_vcpu_count && profile.memory[0].value >= var.min_memory_gb
+    profile if profile.vcpu_count[0].value >= var.testing_min_vcpu_count && profile.memory[0].value >= var.testing_min_memory_gb
   ] : []
-  cluster_jumphost_profile = var.jumphost_profile != "" ? var.jumphost_profile : (
+  cluster_jumphost_profile = var.testing_jumphost_profile != "" ? var.testing_jumphost_profile : (
     length(local.cluster_eligible_profiles) > 0 ? local.cluster_eligible_profiles[0].name : "bx2-4x16"
   )
+
+  # Map of zone → existing PGW ID for the cluster VPC.
+  # IBM Cloud allows only one PGW per zone per VPC; the cluster VPC already
+  # has one per zone for its worker nodes, so we reuse them instead of
+  # creating new ones (which would exceed the quota).
+  cluster_pgw_by_zone = var.testing_create_cluster_jumphosts ? {
+    for pgw in data.ibm_is_public_gateways.cluster_pgws[0].public_gateways :
+    pgw.zone => pgw.id
+    if pgw.vpc == data.ibm_is_vpc.cluster_vpc[0].id
+  } : {}
 }
 
 # ============================================================
@@ -186,16 +196,16 @@ resource "tls_private_key" "jumphost_shared_key" {
 
 # Client VPC (created only when create_client_vpc = true)
 resource "ibm_is_vpc" "client_vpc" {
-  count          = (var.create_tgw_jumphost && var.create_client_vpc) ? 1 : 0
+  count          = (var.testing_create_tgw_jumphost && var.testing_create_client_vpc) ? 1 : 0
   provider       = ibm.vpc_region
-  name           = var.client_vpc_name
+  name           = var.testing_client_vpc_name
   resource_group = data.ibm_resource_group.resource_group.id
   tags           = ["terraform", "testing"]
 }
 
 # Open default SG on the new VPC to permit all inbound test traffic
 resource "ibm_is_security_group_rule" "tgw_vpc_default_sg_inbound_all" {
-  count     = (var.create_tgw_jumphost && var.create_client_vpc) ? 1 : 0
+  count     = (var.testing_create_tgw_jumphost && var.testing_create_client_vpc) ? 1 : 0
   provider  = ibm.vpc_region
   group     = local.tgw_new_vpc_default_sg
   direction = "inbound"
@@ -203,9 +213,9 @@ resource "ibm_is_security_group_rule" "tgw_vpc_default_sg_inbound_all" {
 }
 
 resource "ibm_is_subnet" "tgw_jumphost_subnet" {
-  count                    = var.create_tgw_jumphost ? 1 : 0
+  count                    = var.testing_create_tgw_jumphost ? 1 : 0
   provider                 = ibm.vpc_region
-  name                     = "${var.tgw_jumphost_name}-subnet"
+  name                     = "${var.testing_tgw_jumphost_name}-subnet"
   vpc                      = local.tgw_vpc_id
   zone                     = local.tgw_jumphost_zone
   total_ipv4_address_count = 256
@@ -213,31 +223,31 @@ resource "ibm_is_subnet" "tgw_jumphost_subnet" {
 }
 
 resource "ibm_is_public_gateway" "tgw_jumphost_gateway" {
-  count          = var.create_tgw_jumphost ? 1 : 0
+  count          = var.testing_create_tgw_jumphost ? 1 : 0
   provider       = ibm.vpc_region
-  name           = "${var.tgw_jumphost_name}-gateway"
+  name           = "${var.testing_tgw_jumphost_name}-gateway"
   vpc            = local.tgw_vpc_id
   zone           = local.tgw_jumphost_zone
   resource_group = data.ibm_resource_group.resource_group.id
 }
 
 resource "ibm_is_subnet_public_gateway_attachment" "tgw_jumphost_subnet_gateway" {
-  count          = var.create_tgw_jumphost ? 1 : 0
+  count          = var.testing_create_tgw_jumphost ? 1 : 0
   provider       = ibm.vpc_region
   subnet         = ibm_is_subnet.tgw_jumphost_subnet[0].id
   public_gateway = ibm_is_public_gateway.tgw_jumphost_gateway[0].id
 }
 
 resource "ibm_is_security_group" "tgw_jumphost_sg" {
-  count          = var.create_tgw_jumphost ? 1 : 0
+  count          = var.testing_create_tgw_jumphost ? 1 : 0
   provider       = ibm.vpc_region
-  name           = "${var.tgw_jumphost_name}-sg"
+  name           = "${var.testing_tgw_jumphost_name}-sg"
   vpc            = local.tgw_vpc_id
   resource_group = data.ibm_resource_group.resource_group.id
 }
 
 resource "ibm_is_security_group_rule" "tgw_jumphost_ssh_inbound" {
-  count     = var.create_tgw_jumphost ? 1 : 0
+  count     = var.testing_create_tgw_jumphost ? 1 : 0
   provider  = ibm.vpc_region
   group     = ibm_is_security_group.tgw_jumphost_sg[0].id
   direction = "inbound"
@@ -248,7 +258,7 @@ resource "ibm_is_security_group_rule" "tgw_jumphost_ssh_inbound" {
 }
 
 resource "ibm_is_security_group_rule" "tgw_jumphost_outbound" {
-  count     = var.create_tgw_jumphost ? 1 : 0
+  count     = var.testing_create_tgw_jumphost ? 1 : 0
   provider  = ibm.vpc_region
   group     = ibm_is_security_group.tgw_jumphost_sg[0].id
   direction = "outbound"
@@ -256,14 +266,14 @@ resource "ibm_is_security_group_rule" "tgw_jumphost_outbound" {
 }
 
 resource "ibm_is_instance" "tgw_jumphost" {
-  count          = var.create_tgw_jumphost ? 1 : 0
+  count          = var.testing_create_tgw_jumphost ? 1 : 0
   provider       = ibm.vpc_region
-  name           = var.tgw_jumphost_name
+  name           = var.testing_tgw_jumphost_name
   vpc            = local.tgw_vpc_id
   zone           = local.tgw_jumphost_zone
   profile        = local.tgw_jumphost_profile
   image          = local.tgw_jumphost_image_id
-  keys           = var.ssh_key_name != "" ? [data.ibm_is_ssh_key.tgw_ssh_key[0].id] : []
+  keys           = var.testing_ssh_key_name != "" ? [data.ibm_is_ssh_key.tgw_ssh_key[0].id] : []
   resource_group = data.ibm_resource_group.resource_group.id
   tags           = ["terraform", "testing", "jumphost", "tgw"]
 
@@ -277,9 +287,9 @@ resource "ibm_is_instance" "tgw_jumphost" {
 }
 
 resource "ibm_is_floating_ip" "tgw_jumphost_fip" {
-  count          = var.create_tgw_jumphost ? 1 : 0
+  count          = var.testing_create_tgw_jumphost ? 1 : 0
   provider       = ibm.vpc_region
-  name           = "${var.tgw_jumphost_name}-fip"
+  name           = "${var.testing_tgw_jumphost_name}-fip"
   target         = ibm_is_instance.tgw_jumphost[0].primary_network_interface[0].id
   resource_group = data.ibm_resource_group.resource_group.id
   tags           = ["terraform", "testing", "jumphost", "tgw"]
@@ -287,7 +297,7 @@ resource "ibm_is_floating_ip" "tgw_jumphost_fip" {
 
 # Connect the client VPC to an existing Transit Gateway
 resource "ibm_tg_connection" "tgw_vpc_connection" {
-  count        = (var.create_tgw_jumphost && var.transit_gateway_name != "") ? 1 : 0
+  count        = (var.testing_create_tgw_jumphost && var.testing_transit_gateway_name != "") ? 1 : 0
   gateway      = data.ibm_tg_gateway.transit_gateway[0].id
   network_type = "vpc"
   name         = local.tgw_vpc_name
@@ -303,14 +313,14 @@ resource "ibm_tg_connection" "tgw_vpc_connection" {
 
 # Shared security group for all cluster jumphosts
 resource "ibm_is_security_group" "cluster_jumphost_sg" {
-  count          = var.create_cluster_jumphosts ? 1 : 0
-  name           = "${var.cluster_jumphost_name_prefix}-sg"
+  count          = var.testing_create_cluster_jumphosts ? 1 : 0
+  name           = "${var.testing_cluster_jumphost_name_prefix}-sg"
   vpc            = data.ibm_is_vpc.cluster_vpc[0].id
   resource_group = data.ibm_resource_group.resource_group.id
 }
 
 resource "ibm_is_security_group_rule" "cluster_jumphost_ssh_inbound" {
-  count     = var.create_cluster_jumphosts ? 1 : 0
+  count     = var.testing_create_cluster_jumphosts ? 1 : 0
   group     = ibm_is_security_group.cluster_jumphost_sg[0].id
   direction = "inbound"
   remote    = "0.0.0.0/0"
@@ -320,7 +330,7 @@ resource "ibm_is_security_group_rule" "cluster_jumphost_ssh_inbound" {
 }
 
 resource "ibm_is_security_group_rule" "cluster_jumphost_outbound" {
-  count     = var.create_cluster_jumphosts ? 1 : 0
+  count     = var.testing_create_cluster_jumphosts ? 1 : 0
   group     = ibm_is_security_group.cluster_jumphost_sg[0].id
   direction = "outbound"
   remote    = "0.0.0.0/0"
@@ -329,35 +339,27 @@ resource "ibm_is_security_group_rule" "cluster_jumphost_outbound" {
 # Per-zone subnet, gateway, instance, and floating IP
 resource "ibm_is_subnet" "cluster_jumphost_subnet" {
   for_each                 = local.cluster_zones
-  name                     = "${var.cluster_jumphost_name_prefix}-${each.key}-subnet"
+  name                     = "${var.testing_cluster_jumphost_name_prefix}-${each.key}-subnet"
   vpc                      = data.ibm_is_vpc.cluster_vpc[0].id
   zone                     = each.key
   total_ipv4_address_count = 256
   resource_group           = data.ibm_resource_group.resource_group.id
 }
 
-resource "ibm_is_public_gateway" "cluster_jumphost_gateway" {
-  for_each       = local.cluster_zones
-  name           = "${var.cluster_jumphost_name_prefix}-${each.key}-gateway"
-  vpc            = data.ibm_is_vpc.cluster_vpc[0].id
-  zone           = each.key
-  resource_group = data.ibm_resource_group.resource_group.id
-}
-
 resource "ibm_is_subnet_public_gateway_attachment" "cluster_jumphost_subnet_gateway" {
-  for_each       = local.cluster_zones
+  for_each       = local.cluster_pgw_by_zone
   subnet         = ibm_is_subnet.cluster_jumphost_subnet[each.key].id
-  public_gateway = ibm_is_public_gateway.cluster_jumphost_gateway[each.key].id
+  public_gateway = each.value
 }
 
 resource "ibm_is_instance" "cluster_jumphost" {
   for_each       = local.cluster_zones
-  name           = "${var.cluster_jumphost_name_prefix}-${each.key}"
+  name           = "${var.testing_cluster_jumphost_name_prefix}-${each.key}"
   vpc            = data.ibm_is_vpc.cluster_vpc[0].id
   zone           = each.key
   profile        = local.cluster_jumphost_profile
   image          = local.cluster_jumphost_image_id
-  keys           = var.ssh_key_name != "" ? [data.ibm_is_ssh_key.cluster_ssh_key[0].id] : []
+  keys           = var.testing_ssh_key_name != "" ? [data.ibm_is_ssh_key.cluster_ssh_key[0].id] : []
   resource_group = data.ibm_resource_group.resource_group.id
   tags           = ["terraform", "testing", "jumphost", "cluster"]
 
@@ -372,7 +374,7 @@ resource "ibm_is_instance" "cluster_jumphost" {
 
 resource "ibm_is_floating_ip" "cluster_jumphost_fip" {
   for_each       = local.cluster_zones
-  name           = "${var.cluster_jumphost_name_prefix}-${each.key}-fip"
+  name           = "${var.testing_cluster_jumphost_name_prefix}-${each.key}-fip"
   target         = ibm_is_instance.cluster_jumphost[each.key].primary_network_interface[0].id
   resource_group = data.ibm_resource_group.resource_group.id
   tags           = ["terraform", "testing", "jumphost", "cluster"]
@@ -423,7 +425,7 @@ resource "null_resource" "cluster_jumphost_hosts" {
       [for zone, fip in ibm_is_floating_ip.cluster_jumphost_fip :
         "printf '${fip.address}  cluster-${zone}\\n' | sudo tee -a /etc/hosts"
       ],
-      var.create_tgw_jumphost ? [
+      var.testing_create_tgw_jumphost ? [
         "printf '${ibm_is_floating_ip.tgw_jumphost_fip[0].address}  tgw-jumphost\\n' | sudo tee -a /etc/hosts",
       ] : [],
       ["printf '# END terraform-jumphosts\\n' | sudo tee -a /etc/hosts"]
@@ -432,7 +434,7 @@ resource "null_resource" "cluster_jumphost_hosts" {
 }
 
 resource "null_resource" "tgw_jumphost_hosts" {
-  count = var.create_tgw_jumphost ? 1 : 0
+  count = var.testing_create_tgw_jumphost ? 1 : 0
 
   triggers = {
     cluster_ips = jsonencode({ for z, f in ibm_is_floating_ip.cluster_jumphost_fip : z => f.address })

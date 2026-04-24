@@ -16,7 +16,7 @@ data "ibm_resource_group" "resource_group" {
 # ============================================================
 
 data "ibm_container_vpc_cluster" "cluster" {
-  name              = var.cluster_name_or_id
+  name              = var.roks_cluster_name_or_id
   resource_group_id = data.ibm_resource_group.resource_group.id
 }
 
@@ -28,38 +28,45 @@ data "ibm_container_vpc_cluster" "cluster" {
 # ibm_container_vpc_cluster does not export vpc_id in provider 2.x.
 # Derive it by looking up a worker subnet and reading its vpc attribute.
 data "ibm_is_subnet" "cluster_worker_subnet" {
-  count      = var.create_cluster_jumphosts ? 1 : 0
+  count      = var.testing_create_cluster_jumphosts ? 1 : 0
   identifier = data.ibm_container_vpc_cluster.cluster.worker_pools[0].zones[0].subnets[0].id
 }
 
 # Cluster VPC — resolved via worker subnet
 data "ibm_is_vpc" "cluster_vpc" {
-  count      = var.create_cluster_jumphosts ? 1 : 0
+  count      = var.testing_create_cluster_jumphosts ? 1 : 0
   identifier = data.ibm_is_subnet.cluster_worker_subnet[0].vpc
 }
 
 # All availability zones in the cluster region
 data "ibm_is_zones" "cluster_region_zones" {
-  count  = var.create_cluster_jumphosts ? 1 : 0
+  count  = var.testing_create_cluster_jumphosts ? 1 : 0
   region = var.ibmcloud_cluster_region
 }
 
 # Ubuntu images in cluster region
 data "ibm_is_images" "cluster_ubuntu_images" {
-  count      = var.create_cluster_jumphosts ? 1 : 0
+  count      = var.testing_create_cluster_jumphosts ? 1 : 0
   visibility = "public"
   status     = "available"
 }
 
 # Instance profiles in cluster region (only when auto-selecting)
 data "ibm_is_instance_profiles" "cluster_profiles" {
-  count = (var.create_cluster_jumphosts && var.jumphost_profile == "") ? 1 : 0
+  count = (var.testing_create_cluster_jumphosts && var.testing_jumphost_profile == "") ? 1 : 0
 }
 
 # SSH key in cluster region
 data "ibm_is_ssh_key" "cluster_ssh_key" {
-  count = (var.create_cluster_jumphosts && var.ssh_key_name != "") ? 1 : 0
-  name  = var.ssh_key_name
+  count = (var.testing_create_cluster_jumphosts && var.testing_ssh_key_name != "") ? 1 : 0
+  name  = var.testing_ssh_key_name
+}
+
+# Existing public gateways in the cluster region — used to attach cluster
+# jumphost subnets to per-zone PGWs that already exist in the cluster VPC
+# (IBM Cloud quota: one PGW per zone per VPC)
+data "ibm_is_public_gateways" "cluster_pgws" {
+  count = var.testing_create_cluster_jumphosts ? 1 : 0
 }
 
 # ============================================================
@@ -69,21 +76,21 @@ data "ibm_is_ssh_key" "cluster_ssh_key" {
 
 # Existing client VPC — looked up when not creating a new one
 data "ibm_is_vpc" "existing_client_vpc" {
-  count    = (var.create_tgw_jumphost && !var.create_client_vpc) ? 1 : 0
+  count    = (var.testing_create_tgw_jumphost && !var.testing_create_client_vpc) ? 1 : 0
   provider = ibm.vpc_region
-  name     = var.client_vpc_name
+  name     = var.testing_client_vpc_name
 }
 
 # First availability zone in the client VPC region (for jumphost placement)
 data "ibm_is_zones" "vpc_region_zones" {
-  count    = var.create_tgw_jumphost ? 1 : 0
+  count    = var.testing_create_tgw_jumphost ? 1 : 0
   provider = ibm.vpc_region
-  region   = var.client_vpc_region
+  region   = var.testing_client_vpc_region
 }
 
 # Ubuntu images in client VPC region
 data "ibm_is_images" "tgw_ubuntu_images" {
-  count      = var.create_tgw_jumphost ? 1 : 0
+  count      = var.testing_create_tgw_jumphost ? 1 : 0
   provider   = ibm.vpc_region
   visibility = "public"
   status     = "available"
@@ -91,19 +98,19 @@ data "ibm_is_images" "tgw_ubuntu_images" {
 
 # Instance profiles in client VPC region (only when auto-selecting)
 data "ibm_is_instance_profiles" "tgw_profiles" {
-  count    = (var.create_tgw_jumphost && var.jumphost_profile == "") ? 1 : 0
+  count    = (var.testing_create_tgw_jumphost && var.testing_jumphost_profile == "") ? 1 : 0
   provider = ibm.vpc_region
 }
 
 # SSH key in client VPC region
 data "ibm_is_ssh_key" "tgw_ssh_key" {
-  count    = (var.create_tgw_jumphost && var.ssh_key_name != "") ? 1 : 0
+  count    = (var.testing_create_tgw_jumphost && var.testing_ssh_key_name != "") ? 1 : 0
   provider = ibm.vpc_region
-  name     = var.ssh_key_name
+  name     = var.testing_ssh_key_name
 }
 
 # Transit Gateway (global resource — uses default provider)
 data "ibm_tg_gateway" "transit_gateway" {
-  count = (var.create_tgw_jumphost && var.transit_gateway_name != "") ? 1 : 0
-  name  = var.transit_gateway_name
+  count = (var.testing_create_tgw_jumphost && var.testing_transit_gateway_name != "") ? 1 : 0
+  name  = var.testing_transit_gateway_name
 }
