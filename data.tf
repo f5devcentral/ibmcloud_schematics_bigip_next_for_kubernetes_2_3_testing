@@ -25,10 +25,17 @@ data "ibm_container_vpc_cluster" "cluster" {
 # Provider: ibm (default — cluster region)
 # ============================================================
 
-# Cluster VPC — resolved from cluster metadata
+# ibm_container_vpc_cluster does not export vpc_id in provider 2.x.
+# Derive it by looking up a worker subnet and reading its vpc attribute.
+data "ibm_is_subnet" "cluster_worker_subnet" {
+  count      = var.create_cluster_jumphosts ? 1 : 0
+  identifier = data.ibm_container_vpc_cluster.cluster.worker_pools[0].zones[0].subnets[0].id
+}
+
+# Cluster VPC — resolved via worker subnet
 data "ibm_is_vpc" "cluster_vpc" {
   count      = var.create_cluster_jumphosts ? 1 : 0
-  identifier = data.ibm_container_vpc_cluster.cluster.vpc_id
+  identifier = data.ibm_is_subnet.cluster_worker_subnet[0].vpc
 }
 
 # All availability zones in the cluster region
