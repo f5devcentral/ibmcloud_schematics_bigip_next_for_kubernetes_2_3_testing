@@ -121,12 +121,18 @@ def parse_tfvars(path):
             if not m:
                 continue
             name, raw = m.group(1), m.group(2).strip()
-            if raw in ("true", "false"):
-                entry = {"name": name, "value": raw, "type": "bool"}
-            elif re.match(r'^-?\d+(\.\d+)?$', raw):
-                entry = {"name": name, "value": raw, "type": "number"}
+            qm = re.match(r'^"((?:[^"\\]|\\.)*)"', raw)
+            if qm:
+                value = qm.group(1)
+                entry = {"name": name, "value": value, "type": "string"}
             else:
-                entry = {"name": name, "value": raw.strip('"'), "type": "string"}
+                value = re.sub(r'\s*#.*$', '', raw).strip()
+                if value in ("true", "false"):
+                    entry = {"name": name, "value": value, "type": "bool"}
+                elif re.match(r'^-?\d+(\.\d+)?$', value):
+                    entry = {"name": name, "value": value, "type": "number"}
+                else:
+                    entry = {"name": name, "value": value, "type": "string"}
             if name in SECURE_VARS:
                 entry["secure"] = True
             variables.append(entry)
