@@ -65,3 +65,8 @@ Thumbs.db
 # Schematics lifecycle test artifacts
 workspace.json
 test-reports/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
