@@ -9,6 +9,8 @@ This Schematics-ready Terraform workspace deploys testing jumphosts for validati
 | `testing_create_tgw_jumphost` | Single jumphost in a client VPC | Client VPC in any region, optionally connected to the cluster via Transit Gateway |
 | `testing_create_cluster_jumphosts` | One jumphost per availability zone | Directly inside the cluster VPC, in every zone of `ibmcloud_cluster_region` |
 
+![Test Client Topology](./assests/images/test_client_topoligy.svg)
+
 Both types run Ubuntu 22.04, share the same SSH key name, and are provisioned with the same user_data boot script.
 
 ## Installed Software
